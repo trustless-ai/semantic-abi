@@ -6,7 +6,8 @@ Thin wrapper over the real Vértice gateway surfaces, mapping them to the semant
 `../../schema/manifest-v0.md`:
 - per-action attestation (EIP-712 L4 + PQ companion) → `INFRASTRUCTURE_ATTESTATION`
 - on-chain anchor (per-action, Base Sepolia) → `ONCHAIN_COMMITMENT@testnet` (anchored ≠ secured)
-- `/verify` (public recompute) → `INDEPENDENT_RECOMPUTATION`
+- `/verify` (public recompute) → `INDEPENDENT_RECOMPUTATION` for the exact re-derived claim and scope;
+  this is not a global upgrade to `SEMANTIC_VERIFICATION`
 - PQ key binding (ERC-8373, mainnet) → `KEY_BINDING_AUTHORITY`
 
 **Cases it makes live:** authority separation (`INFRASTRUCTURE_ATTESTATION ≠ ONCHAIN_COMMITMENT`) and

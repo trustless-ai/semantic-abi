@@ -1,59 +1,78 @@
-// The two levels — kept strictly separate (this separation IS the product).
+// Expected pair truth, observed adapter result, and backend conformance are
+// separate values. No field aliases the oracle as though it were observation.
 export const PAIR = { PRESERVED: "PRESERVED", VIOLATED: "VIOLATED", UNVERIFIABLE: "UNVERIFIABLE" };
 export const BACKEND = { PASS: "PASS", FAIL: "FAIL", CANNOT_CHECK: "CANNOT_CHECK" };
 
-// Evaluate one vector against one adapter. THREE values are always reported separately —
-// never collapsed (Pavlo, before-freeze review):
-//   oracle_pair   = what the fixture pins the evidence pair as doing (ground truth)
-//   observed_pair = what THIS backend actually reported (or null if it couldn't check)
-//   backend       = PASS if observed==oracle, FAIL if it collapsed to a different outcome, CANNOT_CHECK if it couldn't run
-//
-//   vector : { id, relation, oracle: <pair outcome>, fixture }
-//   adapter: { name, observe(vector) -> pair outcome | null }
+// Evaluate one vector against one adapter.
+//   vector : { id, relation, oracle: expected pair outcome, fixture }
+//   adapter: { name, observe(vector) -> observed pair outcome | null }
 export function evaluate(vector, adapter) {
-  let observed;
+  const expectedPair = vector.oracle;
+  let observedPair;
   try {
-    observed = adapter.observe(vector);
+    observedPair = adapter.observe(vector);
   } catch {
-    observed = null;
+    observedPair = null;
   }
-  const base = { relation: vector.relation, vector: vector.id, adapter: adapter.name, oracle_pair: vector.oracle };
 
-  if (observed == null) {
-    return { ...base, observed_pair: null, backend: BACKEND.CANNOT_CHECK };
+  if (observedPair == null || !Object.values(PAIR).includes(observedPair)) {
+    return {
+      relation: vector.relation,
+      vector: vector.id,
+      adapter: adapter.name,
+      expected_pair: expectedPair,
+      observed_pair: PAIR.UNVERIFIABLE,
+      backend_conformance: BACKEND.CANNOT_CHECK,
+    };
   }
-  if (observed === vector.oracle) {
-    return { ...base, observed_pair: observed, backend: BACKEND.PASS };
+
+  if (observedPair === expectedPair) {
+    return {
+      relation: vector.relation,
+      vector: vector.id,
+      adapter: adapter.name,
+      expected_pair: expectedPair,
+      observed_pair: observedPair,
+      backend_conformance: BACKEND.PASS,
+    };
   }
-  // The backend reported a different pair outcome than the fixture's truth — a collapse.
-  // e.g. oracle_pair=VIOLATED, observed_pair=PRESERVED, backend=FAIL — all three kept distinct.
+
   return {
-    ...base,
-    observed_pair: observed,
-    backend: BACKEND.FAIL,
+    relation: vector.relation,
+    vector: vector.id,
+    adapter: adapter.name,
+    expected_pair: expectedPair,
+    observed_pair: observedPair,
+    backend_conformance: BACKEND.FAIL,
     witness: {
       relation: vector.relation,
       vector: vector.id,
       adapter: adapter.name,
-      oracle_pair: vector.oracle,
-      observed_pair: observed,
-      minimal: `oracle ${vector.oracle}, observed ${observed} — protected relation collapsed by the backend`,
+      expected_pair: expectedPair,
+      observed_pair: observedPair,
+      backend_conformance: BACKEND.FAIL,
+      minimal: `expected pair ${expectedPair}, backend observed ${observedPair} — protected relation collapsed`,
     },
   };
 }
 
-// Run every vector across every adapter; return rows + witnesses + separate pair/backend tallies.
+// Run every vector across every adapter and tally each value independently.
 export function run(vectors, adapters) {
   const rows = [];
   const witnesses = [];
-  const tally = { PRESERVED: 0, VIOLATED: 0, UNVERIFIABLE: 0, PASS: 0, FAIL: 0, CANNOT_CHECK: 0 };
-  for (const v of vectors) {
-    for (const a of adapters) {
-      const r = evaluate(v, a);
-      rows.push(r);
-      tally[r.oracle_pair]++; // pair tally follows the ground-truth pair outcome
-      tally[r.backend]++;
-      if (r.witness) witnesses.push(r.witness);
+  const tally = {
+    expected_pair: { PRESERVED: 0, VIOLATED: 0, UNVERIFIABLE: 0 },
+    observed_pair: { PRESERVED: 0, VIOLATED: 0, UNVERIFIABLE: 0 },
+    backend_conformance: { PASS: 0, FAIL: 0, CANNOT_CHECK: 0 },
+  };
+  for (const vector of vectors) {
+    for (const adapter of adapters) {
+      const result = evaluate(vector, adapter);
+      rows.push(result);
+      tally.expected_pair[result.expected_pair]++;
+      tally.observed_pair[result.observed_pair]++;
+      tally.backend_conformance[result.backend_conformance]++;
+      if (result.witness) witnesses.push(result.witness);
     }
   }
   return { rows, witnesses, tally };

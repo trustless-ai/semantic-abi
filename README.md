@@ -19,30 +19,34 @@ Built at **ETHOnline 2026** (from-scratch track) by the trustless-ai working gro
 
 ## The two levels (kept strictly separate)
 
-Every evaluation reports two independent results — collapsing them is the exact defect this project detects:
+Every evaluation has two levels and keeps three values explicit — collapsing them is the exact defect this
+project detects:
 
-- **pair outcome** — `PRESERVED | VIOLATED | UNVERIFIABLE` — what the tested evidence *pair* did.
-- **backend conformance** — `PASS | FAIL | CANNOT_CHECK` — whether the *system under test* did its job.
+- **expected pair** — `PRESERVED | VIOLATED | UNVERIFIABLE` — the vector oracle.
+- **observed pair** — `PRESERVED | VIOLATED | UNVERIFIABLE` — the adapter observation.
+- **backend conformance** — `PASS | FAIL | CANNOT_CHECK` — whether the observation matches the oracle.
 
-A tampered proof → **pair VIOLATED**, backend **PASS** (it correctly detected the violation). Backend
-**FAIL** only when a real distinction is *collapsed*. Each vector pins an expected pair outcome (the oracle);
-conformance is observed-vs-oracle, backed by a reproducible **witness / minimal counterexample**.
+For an adversarial pair, expected `VIOLATED` plus observed `VIOLATED` yields backend `PASS`. Expected
+`VIOLATED` plus observed `PRESERVED` yields backend `FAIL`: the backend collapsed a real distinction.
+Conformance is observation-vs-oracle, backed by a reproducible **witness / minimal counterexample**.
 
 ## Semantic manifests
 
-Each protocol/endpoint/adapter declares what it means:
+Each protocol/endpoint/adapter declares typed claim-level evidence:
 
 ```
-Evidence< claim_type, authority_class, scope, as_of >
+EvidenceClaim< claim_type, authority_class, scope, issued_at | verification_time >
 
-consumes:            ...
-establishes:         exactly one authority class
-does_not_establish:  the classes it explicitly disclaims   ← the field that makes a TYPE ERROR possible
-authority_class:     ...
+consumes:            claim-level input requirements
+establishes:         claim-level outputs
+does_not_establish:  explicit negative claim boundaries
 ```
 
-A **semantic linker** checks a composition: `producer.establishes ⊇ consumer.requires` → valid edge; else a
-meaning-level **TYPE ERROR** + counterexample (the implicit authority upgrade, caught).
+`claim_type` is the proposition; `authority_class` is how that proposition was established. A **semantic
+linker** checks claim + authority + scope + temporal compatibility. A mismatch produces a meaning-level
+**TYPE ERROR** with the smallest unsupported semantic upgrade. Independent recomputation is never a global
+coercion to semantic verification: it can satisfy only the exact recomputable claim and boundary it
+re-derived.
 
 Pipeline: `manifests → typed relation graph → linker → live/replay adapters → protected-relation eval → witness`
 

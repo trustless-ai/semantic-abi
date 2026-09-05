@@ -1,89 +1,108 @@
 // semantic-abi — runnable demo. Zero dependencies: `node runner/demo.mjs`.
-//   1. Semantic linker: valid edge + TYPE ERRORs, incl. a claim/scope-specific one
-//      (recompute of one receipt does NOT establish semantic verification of another).
-//   2. Two-level runner: oracle_pair / observed_pair / backend kept separate, reproducing
-//      the pre-v18 collapse as oracle=VIOLATED, observed=PRESERVED, backend=FAIL + a witness.
+//   1. Claim-, authority-, scope-, and time-aware semantic linking.
+//   2. Expected pair / observed pair / backend conformance kept explicit.
 import { linkEdge } from "./src/linker.mjs";
 import { run } from "./src/evaluate.mjs";
 import { goodBackend, collapsingBackend, pendingBackend } from "./src/adapters.mjs";
 import { VECTORS } from "./vectors/relations.mjs";
 
 const line = (s = "") => console.log(s);
-const rule = () => line("─".repeat(74));
+const rule = () => line("─".repeat(72));
 
 line("\n  semantic-abi · demo — type-check MEANING, not bytes\n");
 
-// ── 1. Semantic linker (claim- and scope-specific) ───────────────────────────
+// ── 1. Semantic linker ───────────────────────────────────────────────────────
 rule();
-line("  1. SEMANTIC LINKER — authority transfers only for the SAME claim at the SAME scope");
+line("  1. SEMANTIC LINKER — can this composition upgrade authority silently?");
 rule();
 
-const recompute = {
+const claim = (claim_type, authority_class, scope, temporal = { verification_time: "receipt.verified_at" }) =>
+  ({ claim_type, authority_class, scope, ...temporal });
+const boundary = (claim_type, authority_class, scope, reason) =>
+  ({ claim_type, authority_class, scope, reason });
+
+const actionScope = "action:demo-001/output";
+const verticeVerify = {
   component: "vertice./verify",
-  establishes: { authority_class: "INDEPENDENT_RECOMPUTATION", claim_type: "agent_action", scope: "receipt:0xab12" },
-  does_not_establish: [],
+  establishes: [claim("DETERMINISTIC_ACTION_RESULT", "INDEPENDENT_RECOMPUTATION", actionScope)],
+  does_not_establish: [
+    boundary("ACTION_SETTLED", "EX_POST_VALIDATION", actionScope, "recomputation is not settlement"),
+  ],
 };
-const attest = {
+const verticeAttest = {
   component: "vertice.attestation",
-  establishes: { authority_class: "INFRASTRUCTURE_ATTESTATION", claim_type: "agent_action", scope: "receipt:0xab12" },
-  does_not_establish: ["SEMANTIC_VERIFICATION", "INDEPENDENT_RECOMPUTATION"],
+  establishes: [claim("ACTION_RECEIPT_AUTHENTIC", "INFRASTRUCTURE_ATTESTATION", actionScope,
+    { issued_at: "receipt.issued_at" })],
+  does_not_establish: [
+    boundary("DETERMINISTIC_ACTION_RESULT", "SEMANTIC_VERIFICATION", actionScope,
+      "an infrastructure attestation does not re-derive action semantics"),
+  ],
+};
+const onchainAnchor = {
+  component: "vertice.anchor@testnet",
+  establishes: [claim("RECEIPT_DIGEST_COMMITTED", "ONCHAIN_COMMITMENT", actionScope,
+    { issued_at: "anchor.block_time" })],
+  does_not_establish: [
+    boundary("ACTION_SETTLED", "EX_POST_VALIDATION", actionScope,
+      "a testnet commitment is not economic settlement"),
+  ],
 };
 
 const checks = [
-  // recompute of receipt 0xab12 ⇒ semantic verification of the SAME receipt — valid
-  [recompute, { authority_class: "SEMANTIC_VERIFICATION", claim_type: "agent_action", scope: "receipt:0xab12" }],
-  // recompute of 0xab12 ⇒ semantic verification of a DIFFERENT receipt — TYPE ERROR (no global upgrade)
-  [recompute, { authority_class: "SEMANTIC_VERIFICATION", claim_type: "agent_action", scope: "receipt:0xff99" }],
-  // attestation ⇒ semantic verification — TYPE ERROR (attestation is not verification; disclaimed)
-  [attest, { authority_class: "SEMANTIC_VERIFICATION", claim_type: "agent_action", scope: "receipt:0xab12" }],
+  [verticeVerify, claim("DETERMINISTIC_ACTION_RESULT", "SEMANTIC_VERIFICATION", actionScope)],
+  [verticeVerify, claim("NONDETERMINISTIC_JUDGMENT_CORRECT", "SEMANTIC_VERIFICATION", actionScope)],
+  [verticeAttest, claim("DETERMINISTIC_ACTION_RESULT", "SEMANTIC_VERIFICATION", actionScope)],
+  [onchainAnchor, claim("ACTION_SETTLED", "EX_POST_VALIDATION", actionScope,
+    { issued_at: "anchor.block_time" })],
 ];
 for (const [producer, required] of checks) {
-  const r = linkEdge(producer, required);
-  if (r.valid) {
-    line(`  ✓ ${producer.component}`);
-    line(`      valid edge: ${r.edge}`);
+  const result = linkEdge(producer, required);
+  if (result.valid) {
+    line(`  ✓ ${producer.component}  ⇒  requires ${required.claim_type} / ${required.authority_class}`);
+    line(`      valid claim+authority+scope edge: ${required.scope}`);
   } else {
-    line(`  ✗ ${producer.component}  —  TYPE ERROR (${r.counterexample.failed_on})`);
-    line(`      ${r.counterexample.producer_establishes}  ⇏  ${r.counterexample.consumer_requires}`);
-    line(`      ${r.counterexample.note}`);
+    line(`  ✗ ${producer.component}  ⇒  requires ${required.claim_type} / ${required.authority_class}`);
+    line(`      TYPE ERROR — ${result.counterexample.reason}`);
+    line(`      mismatched: ${result.counterexample.minimal_unsupported_semantic_upgrade.mismatched_dimensions.join(", ")}`);
   }
   line();
 }
 
 // ── 2. Two-level protected-relation runner ───────────────────────────────────
 rule();
-line("  2. RUNNER — oracle_pair · observed_pair · backend, kept separate (3 backends)");
+line("  2. RUNNER — expected pair × observed pair × backend conformance");
 rule();
 
 const adapters = [
   goodBackend("vertice-gw"),
-  collapsingBackend("invinoveritas@pre-v18", "signed_decision_commitment"), // replay of the real bug
+  collapsingBackend("invinoveritas@pre-v18", "signed_decision_commitment"),
   pendingBackend("horizon-shield"),
 ];
 
 const { rows, witnesses, tally } = run(VECTORS, adapters);
 
-const pad = (s, n) => String(s === null ? "—" : s).padEnd(n);
-line(`  ${pad("vector", 13)}${pad("adapter", 24)}${pad("oracle", 13)}${pad("observed", 13)}backend`);
-line(`  ${"-".repeat(70)}`);
-for (const r of rows) {
-  line(`  ${pad(r.vector, 13)}${pad(r.adapter, 24)}${pad(r.oracle_pair, 13)}${pad(r.observed_pair, 13)}${r.backend}`);
+const pad = (s, n) => String(s).padEnd(n);
+line(`  ${pad("vector", 14)}${pad("adapter", 24)}${pad("expected", 14)}${pad("observed", 14)}conformance`);
+line(`  ${"-".repeat(88)}`);
+for (const result of rows) {
+  line(`  ${pad(result.vector, 14)}${pad(result.adapter, 24)}${pad(result.expected_pair, 14)}${pad(result.observed_pair, 14)}${result.backend_conformance}`);
 }
 
 line();
-line(`  pairs (oracle) · PRESERVED ${tally.PRESERVED}  VIOLATED ${tally.VIOLATED}  UNVERIFIABLE ${tally.UNVERIFIABLE}`);
-line(`  backends       · PASS ${tally.PASS}  FAIL ${tally.FAIL}  CANNOT_CHECK ${tally.CANNOT_CHECK}`);
+line(`  expected  · PRESERVED ${tally.expected_pair.PRESERVED}  VIOLATED ${tally.expected_pair.VIOLATED}  UNVERIFIABLE ${tally.expected_pair.UNVERIFIABLE}`);
+line(`  observed  · PRESERVED ${tally.observed_pair.PRESERVED}  VIOLATED ${tally.observed_pair.VIOLATED}  UNVERIFIABLE ${tally.observed_pair.UNVERIFIABLE}`);
+line(`  backends  · PASS ${tally.backend_conformance.PASS}  FAIL ${tally.backend_conformance.FAIL}  CANNOT_CHECK ${tally.backend_conformance.CANNOT_CHECK}`);
 
-// ── 3. Witnesses ─────────────────────────────────────────────────────────────
+// ── 3. Witnesses (minimal counterexamples) ───────────────────────────────────
 line();
 rule();
 line(`  3. WITNESSES — ${witnesses.length} collapse(s) caught`);
 rule();
-for (const w of witnesses) {
-  line(`  ✗ ${w.adapter} · ${w.relation} [${w.vector}]`);
-  line(`      ${w.minimal}`);
+for (const witness of witnesses) {
+  line(`  ✗ ${witness.adapter} · ${witness.relation} [${witness.vector}]`);
+  line(`      ${witness.minimal}`);
 }
 line();
-line("  A tampered fixture is oracle=VIOLATED; a correct backend observes VIOLATED and PASSes.");
-line("  FAIL = observed differs from oracle (a real collapse). Three values, never merged.");
-line("  Don't trust it — recompute it.\n");
+line("  Note: expected VIOLATED + observed VIOLATED means PASS. Expected VIOLATED +");
+line("  observed PRESERVED means FAIL: the backend collapsed a real distinction. Oracle,");
+line("  observation, and conformance stay explicit. Don't trust it — recompute it.\n");

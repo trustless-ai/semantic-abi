@@ -32,8 +32,14 @@ signed-commitment collapse (`invinoveritas@pre-v18`) as expected `VIOLATED`, obs
 - ✅ `demo.mjs` — end-to-end runnable
 
 ## Next (ETHOnline)
-- [ ] general JSON-Schema loader (the runner already enforces the v0 shape without dependencies)
-- [ ] real per-owner adapters reading live/replay endpoints (`../adapters/*`) — no shared checker
-- [ ] pin the pre-v18 replay evidence
+- [ ] general manifest file loader + JSON-Schema validation against `../schema/manifest.schema.json`
+      (the runner already enforces the v0 shape without dependencies)
+- [~] real per-owner adapters reading live/replay endpoints (`../adapters/*`) — no shared checker.
+      `invinoveritas` has one real adapter now (`signed_decision_commitment` only —
+      `../adapters/invinoveritas/`, `node ../adapters/invinoveritas/demo.mjs`); `vertice` and
+      `horizon-shield` still reference-only, and invinoveritas's own other two relations
+      (`authority_separation`, `proof_vs_header_authority`) are still unwired too
+- [x] pin the pre-v18 replay evidence — done for `signed_decision_commitment`
+      (`../adapters/invinoveritas/vendor/`, real git-cited before/after, not synthetic)
 - [ ] freeze the authority-class enum
 - [x] generic temporal alias removed — use exactly one of `issued_at` or `verification_time` per claim; see `../schema/manifest-v0.md` (commit 7ef8761)

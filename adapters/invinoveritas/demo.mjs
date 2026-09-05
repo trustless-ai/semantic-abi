@@ -35,3 +35,4 @@ console.log(
     ? "\n  Matches the expected pattern: the real pre-v18 collapse reproduces as a genuine FAIL, the real v18 fix and a clean control both PASS — independently recomputed, not asserted.\n"
     : "\n  Does NOT match the expected pattern — see rows above, something regressed.\n"
 );
+if (!expected) process.exitCode = 1;

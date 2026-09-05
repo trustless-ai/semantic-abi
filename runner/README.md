@@ -1,37 +1,39 @@
 # runner
 
-The protected-relation runner. Takes a set of manifests + a vector (a fixture pinning an expected **pair
-outcome**), runs it through pluggable adapters, and reports **two levels, kept separate**:
+The protected-relation runner takes a set of manifests plus a vector and runs it through pluggable adapters.
+It reports the oracle, observation, and grade separately:
 
-- **pair outcome** — `PRESERVED | VIOLATED | UNVERIFIABLE` (what the evidence pair did)
-- **backend conformance** — `PASS | FAIL | CANNOT_CHECK` (observed pair outcome vs the pinned oracle)
+- **expected pair** — `PRESERVED | VIOLATED | UNVERIFIABLE` (the vector oracle)
+- **observed pair** — `PRESERVED | VIOLATED | UNVERIFIABLE` (the adapter observation)
+- **backend conformance** — `PASS | FAIL | CANNOT_CHECK` (observation vs oracle)
 
 On the first boundary where a backend collapses a protected relation, the runner emits a **minimal,
 machine-checkable counterexample** (the witness).
 
-A tampered input must yield **pair VIOLATED + backend PASS** (the backend detected it). Backend **FAIL** is
-reserved for a genuine collapse. Never conflate the two — collapsing them is the defect this tool exists to
-find.
+For an adversarial pair with expected `VIOLATED`, a conforming backend reports observed `VIOLATED` and
+earns `PASS`. A collapsing backend reports observed `PRESERVED` and earns `FAIL`. An unavailable backend
+reports observed `UNVERIFIABLE` and receives `CANNOT_CHECK`.
 
 ## Run it (zero dependencies)
 ```
 node runner/demo.mjs
 ```
-Shows: (1) the semantic linker passing a valid edge and throwing two meaning-level TYPE ERRORs with
-counterexamples; (2) the two-level runner across three independent adapters, reproducing a real
-signed-commitment collapse (`invinoveritas@pre-v18`) as a single backend FAIL + a minimal witness — while
-every tampered fixture correctly reads *pair VIOLATED, backend PASS* on conforming adapters.
+Shows: (1) the semantic linker checking claim + authority + scope + temporal identity and rejecting
+unsupported upgrades; (2) the runner across three independent adapters, reproducing the historical
+signed-commitment collapse (`invinoveritas@pre-v18`) as expected `VIOLATED`, observed `PRESERVED`, `FAIL`.
 
 ## Working now
-- ✅ `src/classes.mjs` — authority classes + satisfy-closure
-- ✅ `src/linker.mjs` — `producer.establishes ⊇ consumer.requires` → edge | TYPE ERROR + counterexample
-- ✅ `src/evaluate.mjs` — two-level evaluator (pair × backend) + witness emitter + tallies
+- ✅ `src/classes.mjs` — authority-class vocabulary without global coercions
+- ✅ `src/linker.mjs` — claim/authority/scope/time edge checking | TYPE ERROR + counterexample
+- ✅ `src/evaluate.mjs` — expected pair × observed pair × backend conformance + witness/tallies
+- ✅ `src/manifest.mjs` — zero-dependency fail-closed manifest-shape validator
 - ✅ `src/adapters.mjs` — reference adapters (good / collapsing / pending)
 - ✅ `vectors/relations.mjs` — vectors pinning expected pair outcomes for the 3 relations
 - ✅ `demo.mjs` — end-to-end runnable
 
 ## Next (ETHOnline)
-- [ ] manifest loader + JSON-Schema validation against `../schema/manifest.schema.json`
+- [ ] general manifest file loader + JSON-Schema validation against `../schema/manifest.schema.json`
+      (the runner already enforces the v0 shape without dependencies)
 - [~] real per-owner adapters reading live/replay endpoints (`../adapters/*`) — no shared checker.
       `invinoveritas` has one real adapter now (`signed_decision_commitment` only —
       `../adapters/invinoveritas/`, `node ../adapters/invinoveritas/demo.mjs`); `vertice` and
@@ -40,4 +42,4 @@ every tampered fixture correctly reads *pair VIOLATED, backend PASS* on conformi
 - [x] pin the pre-v18 replay evidence — done for `signed_decision_commitment`
       (`../adapters/invinoveritas/vendor/`, real git-cited before/after, not synthetic)
 - [ ] freeze the authority-class enum
-- [x] `as_of` resolved — split into `issued_at` vs `verification_time` (never both on one claim); see `../schema/manifest-v0.md` (commit 7ef8761)
+- [x] generic temporal alias removed — use exactly one of `issued_at` or `verification_time` per claim; see `../schema/manifest-v0.md` (commit 7ef8761)

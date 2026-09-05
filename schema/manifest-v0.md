@@ -1,87 +1,172 @@
 # Semantic manifest — v0 (draft, not yet frozen)
 
-A manifest declares, per endpoint/component, **what its evidence is allowed to mean**. The generalizable
-principle: every component establishes **exactly one** authority class and **explicitly disclaims the rest**.
-`does_not_establish` is not a nice-to-have — it is the field that makes the linker's TYPE ERROR possible at
-all. Without it, every component just returns `true` and there is nothing to catch an implicit authority
-upgrade against.
+A manifest declares, per endpoint/component, what each evidence claim is allowed to mean. The claim,
+authority, scope, and temporal boundary form one typed unit:
 
-## Fields
+```text
+EvidenceClaim<claim_type, authority_class, scope, issued_at | verification_time>
 ```
-Evidence< claim_type, authority_class, scope, as_of >
-```
+
+`claim_type` names the proposition. `authority_class` names how that proposition was established. They are
+different namespaces: `SIGNED_VERDICT_AUTHENTIC` is a claim, while `CRYPTOGRAPHIC_VERIFICATION` is an
+authority class. Neither may be substituted for the other.
+
+## Declaration fields
+
 | field | meaning |
 |---|---|
-| `consumes` | what the component takes as input |
-| `establishes` | the ONE authority class this component genuinely creates |
-| `does_not_establish` | the classes it explicitly disclaims (enables TYPE ERROR detection) |
-| `authority_class` | the class label of `establishes` |
-| `scope` | over what the claim holds (per-action, value@root, per-review…) |
-| `as_of` | ✅ RESOLVED (Pavlo/Fede, 2026-09-05): `as_of` is not one field, it is one of TWO distinct timestamps depending on which side of a verification a component sits on — `issued_at` (when the underlying decision/attestation was made, e.g. `/review`'s verdict, an on-chain anchor) vs `verification_time` (when a *separate* recompute/check act happened, e.g. `/verify-proof`, `/verify` recompute). A component that only issues uses `issued_at`; a component whose whole job is checking something else's issuance uses `verification_time`; a component never uses both for the same claim. Blurring the two under one generic `as_of` name is exactly the kind of collapse-under-a-shared-name failure this whole exercise exists to catch. |
+| `consumes` | an array of typed claim-level evidence requirements |
+| `establishes` | a non-empty array of typed claim-level evidence created by this component |
+| `does_not_establish` | explicit negative claim boundaries, each naming claim, authority, and scope |
+| `claim_type` | the proposition established or required |
+| `authority_class` | how that specific claim is established |
+| `scope` | the exact boundary over which that claim holds |
+| `issued_at` | when the underlying claim was made or originated |
+| `verification_time` | when a separate check/recomputation of a claim occurred |
 
-Two result levels, kept separate by the runner:
-- **pair outcome**: `PRESERVED | VIOLATED | UNVERIFIABLE`
-- **backend conformance**: `PASS | FAIL | CANNOT_CHECK`
+Every consumed or established claim contains exactly one temporal field. A component never uses both for
+the same claim. An issuing component uses `issued_at`; a component whose claim is the result of checking
+something else uses `verification_time`. There is no generic temporal alias.
 
----
+Negative boundaries are also claim-level. For example, "this authentic signed verdict does not establish
+that the judgment is correct" names both the unsupported correctness claim and the authority that would be
+needed. A bare claim name or authority-class string is not a valid negative boundary.
 
-## Worked manifest — invinoveritas (authored by @babyblueviper1)
-```
-/review (sign=true):
-  consumes:            an artifact + proposed action
-  establishes:         SIGNED_VERDICT — independently-issued judgment, schnorr-signed, decision_ref bound to artifact+verdict+policy
-  does_not_establish:  PROOF_OF_EXECUTION, SEMANTIC_TRUTH
-  authority_class:     INDEPENDENT_JUDGMENT
-  issued_at:           when the verdict was signed
+The minimal v0 authority-class enum is:
 
-/verify-proof:
-  consumes:            a SIGNED_VERDICT event
-  establishes:         AUTHENTICITY — signature valid, decision_ref recomputes from stored preimage
-  does_not_establish:  that the judgment was correct  (valid=true means REAL, not RIGHT — the trap)
-  authority_class:     CRYPTOGRAPHIC_VERIFICATION
-  verification_time:   when this specific recompute check ran (distinct from the verdict's own issued_at)
-
-/ledger outcome_evidence:
-  consumes:            a settled real-world result
-  establishes:         OUTCOME_SETTLEMENT — was the verdict later proven right/wrong
-  does_not_establish:  anything about the verdict's own pre-outcome commitment
-  authority_class:     EX_POST_VALIDATION
-  issued_at:           when the outcome settled (this component originates the settlement claim, it doesn't verify someone else's)
-
-freshness_beacon (Bitcoin-anchored):
-  establishes:         NOT_BACKDATED — existed no later than a real chain-tip time
-  does_not_establish:  verdict correctness
-  issued_at:           the anchor block time
+```text
+INDEPENDENT_JUDGMENT
+CRYPTOGRAPHIC_VERIFICATION
+EX_POST_VALIDATION
+INFRASTRUCTURE_ATTESTATION
+ONCHAIN_COMMITMENT
+INDEPENDENT_RECOMPUTATION
+KEY_BINDING_AUTHORITY
+SEMANTIC_VERIFICATION
 ```
 
-## Worked manifest — Vértice gateway (authored by @TMerlini)
+Claim names such as `STATE_INCLUSION`, `NOT_BACKDATED`, or `ACTION_SETTLED` do not become authority
+classes merely because an earlier draft used them in a negative boundary.
+
+The runner keeps three values explicit:
+
+- `expected_pair`: `PRESERVED | VIOLATED | UNVERIFIABLE`, pinned by the vector oracle;
+- `observed_pair`: `PRESERVED | VIOLATED | UNVERIFIABLE`, returned by the adapter;
+- `backend_conformance`: `PASS | FAIL | CANNOT_CHECK`, derived from the first two.
+
+## Worked manifest — InvinoVeritas
+
+```json
+{
+  "component": "invinoveritas",
+  "author": "@babyblueviper1",
+  "declarations": [
+    {
+      "endpoint": "/review?sign=true",
+      "consumes": [],
+      "establishes": [
+        {
+          "claim_type": "SIGNED_VERDICT",
+          "authority_class": "INDEPENDENT_JUDGMENT",
+          "scope": "verdict:event-id",
+          "issued_at": "proof.created_at"
+        }
+      ],
+      "does_not_establish": [
+        {
+          "claim_type": "JUDGMENT_CORRECT",
+          "authority_class": "SEMANTIC_VERIFICATION",
+          "scope": "verdict:event-id"
+        }
+      ]
+    },
+    {
+      "endpoint": "/verify-proof",
+      "consumes": [
+        {
+          "claim_type": "SIGNED_VERDICT",
+          "authority_class": "INDEPENDENT_JUDGMENT",
+          "scope": "verdict:event-id",
+          "issued_at": "proof.created_at"
+        }
+      ],
+      "establishes": [
+        {
+          "claim_type": "SIGNED_VERDICT_AUTHENTIC",
+          "authority_class": "CRYPTOGRAPHIC_VERIFICATION",
+          "scope": "verdict:event-id",
+          "verification_time": "verification.completed_at"
+        }
+      ],
+      "does_not_establish": [
+        {
+          "claim_type": "JUDGMENT_CORRECT",
+          "authority_class": "SEMANTIC_VERIFICATION",
+          "scope": "verdict:event-id",
+          "reason": "valid means authentic, not correct"
+        }
+      ]
+    }
+  ]
+}
 ```
-per-action attestation (EIP-712 L4 + PQ companion):
-  consumes:            an agent action (inputs + produced output)
-  establishes:         INFRASTRUCTURE_ATTESTATION — operator-signed + per-agent PQ companion signature
-  does_not_establish:  SEMANTIC_VERIFICATION, INDEPENDENT_RECOMPUTATION, OUTCOME_SETTLEMENT
-  authority_class:     INFRASTRUCTURE_ATTESTATION
 
-on-chain anchor (per-action, Base Sepolia):
-  consumes:            the attestation digest
-  establishes:         ONCHAIN_COMMITMENT@testnet — digest committed at a block
-  does_not_establish:  ECONOMIC_SETTLEMENT (it's a testnet — anchored ≠ secured), SEMANTIC_VERIFICATION
-  authority_class:     ONCHAIN_COMMITMENT (testnet-scoped — NOT finality)
+For the adversarial epistemic-basis pair, both historical and repaired vectors have
+`expected_pair = VIOLATED`. The historical pre-v18 commitment observed `PRESERVED`, so its backend
+conformance is `FAIL`. The v18 commitment observes `VIOLATED`, so its backend conformance is `PASS`.
+The repair changed whether the backend detects the distinction; it did not turn the adversarial pair into a
+preserved pair.
 
-/verify (public recompute):
-  consumes:            a receipt id
-  establishes:         INDEPENDENT_RECOMPUTATION — third party re-derived from public data, matches
-  does_not_establish:  correctness of any non-deterministic judgment inside the action
-  authority_class:     INDEPENDENT_RECOMPUTATION
+## Worked manifest — Vértice gateway
 
-PQ key binding (ERC-8373, mainnet):
-  consumes:            agent identity + ML-DSA-65 / SLH-DSA public keys
-  establishes:         KEY_BINDING_AUTHORITY — classical→PQ binding, mainnet-anchored, non-custodial, dual-family
-  does_not_establish:  any action's correctness
-  authority_class:     KEY_BINDING_AUTHORITY
+```json
+{
+  "component": "vertice-gateway",
+  "author": "@TMerlini",
+  "declarations": [
+    {
+      "endpoint": "/verify",
+      "consumes": [
+        {
+          "claim_type": "ACTION_RECEIPT",
+          "authority_class": "INFRASTRUCTURE_ATTESTATION",
+          "scope": "action:receipt-id",
+          "issued_at": "receipt.issued_at"
+        }
+      ],
+      "establishes": [
+        {
+          "claim_type": "DETERMINISTIC_ACTION_RESULT",
+          "authority_class": "INDEPENDENT_RECOMPUTATION",
+          "scope": "action:receipt-id/output",
+          "verification_time": "verification.completed_at"
+        }
+      ],
+      "does_not_establish": [
+        {
+          "claim_type": "NONDETERMINISTIC_JUDGMENT_CORRECT",
+          "authority_class": "SEMANTIC_VERIFICATION",
+          "scope": "action:receipt-id/output",
+          "reason": "the judgment is outside the recomputable claim"
+        },
+        {
+          "claim_type": "ACTION_SETTLED",
+          "authority_class": "EX_POST_VALIDATION",
+          "scope": "action:receipt-id"
+        }
+      ]
+    }
+  ]
+}
 ```
+
+Independent recomputation does not globally satisfy semantic verification. It can support that authority
+only for the exact recomputable claim, compatible scope, and matching temporal boundary that it actually
+re-derived. A different claim, wider scope, or different time remains a `TYPE_ERROR`.
 
 ## Open items before freezing v0
-- [x] Resolve `as_of` (issued_at vs verified_at) — Pavlo/Fede. Resolved above: two distinct fields, never both on one claim.
-- [ ] Freeze the closed enum of authority classes.
-- [ ] Confirm field names final: `consumes / establishes / does_not_establish / authority_class`.
+
+- [x] Split temporal identity into `issued_at` and `verification_time`, never both on one claim.
+- [x] Make `consumes`, `establishes`, and `does_not_establish` claim-level structures.
+- [x] Remove the global `INDEPENDENT_RECOMPUTATION -> SEMANTIC_VERIFICATION` coercion.
+- [x] Close the minimal authority-class enum without retaining claim names as aliases.

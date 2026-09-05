@@ -5,8 +5,9 @@
 **Status: wired, ahead of the manifest schema freeze.** `adapter.mjs` is a real adapter, not a
 reference stand-in — `observe()` shells out to `vendor/invino_signed_decision_commitment.py` and
 independently derives the pair outcome from an actual computed sha256, never from the vector's own
-oracle. Run it standalone: `node adapters/invinoveritas/demo.mjs` (needs `python3` on PATH, stdlib
-only, no pip installs).
+oracle. Run it standalone: `node adapters/invinoveritas/demo.mjs` (needs Python 3 on PATH:
+`python3` on POSIX or `python` on Windows; stdlib only, no pip installs). Set
+`SEMANTIC_ABI_PYTHON` to an explicit Python 3 executable when neither platform default is appropriate.
 
 **Flagship case:** signed decision commitment — `reject/evidence_against ≠ reject/insufficient_evidence`.
 A real, shipped, git-verifiable bug: before `REVIEW_POLICY_VERSION` v18, invinoveritas's
@@ -20,12 +21,15 @@ preimage's final field.
 Three vectors, oracle fixed and version-independent (an adversarial pair's underlying claim is
 genuinely different no matter which code processes it — what changes is whether the backend
 *observes* that):
-- **`invino-pre-v18-adversarial`**: `oracle VIOLATED, observed PRESERVED, backend FAIL` — the real
+- **`invino-pre-v18-adversarial`**: `expected_pair=VIOLATED`, `observed_pair=PRESERVED`,
+  `backend_conformance=FAIL` — the real
   historical collapse, reproduced, not a bug in this adapter. A conforming adapter is *supposed*
   to reproduce this exact failure when replaying the pre-v18 preimage shape.
-- **`invino-post-v18-adversarial`**: `oracle VIOLATED, observed VIOLATED, backend PASS` — the same
+- **`invino-post-v18-adversarial`**: `expected_pair=VIOLATED`, `observed_pair=VIOLATED`,
+  `backend_conformance=PASS` — the same
   adversarial pair against the current preimage shape; the fix genuinely holds.
-- **`invino-post-v18-clean`**: `oracle PRESERVED, observed PRESERVED, backend PASS` — a control
+- **`invino-post-v18-clean`**: `expected_pair=PRESERVED`, `observed_pair=PRESERVED`,
+  `backend_conformance=PASS` — a control
   (same `epistemic_basis` both sides, no tampering), proving the adapter isn't just always
   reporting "different" regardless of input.
 

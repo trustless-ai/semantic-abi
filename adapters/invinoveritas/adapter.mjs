@@ -19,13 +19,15 @@ import { PAIR } from "../../runner/src/evaluate.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(__dirname, "vendor", "invino_signed_decision_commitment.py");
 const MODES = new Set(["pre_v18", "post_v18", "post_v18_clean"]);
+const PYTHON = process.env.SEMANTIC_ABI_PYTHON
+  ?? (process.platform === "win32" ? "python" : "python3");
 
 export const invinoveritasAdapter = {
   name: "invinoveritas",
   observe(vector) {
     if (vector.relation !== "signed_decision_commitment") return null;
     if (!MODES.has(vector.mode)) return null;
-    const out = execFileSync("python3", [SCRIPT, vector.mode], { encoding: "utf8" });
+    const out = execFileSync(PYTHON, [SCRIPT, vector.mode], { encoding: "utf8" });
     const { distinct } = JSON.parse(out);
     return distinct ? PAIR.VIOLATED : PAIR.PRESERVED;
   },

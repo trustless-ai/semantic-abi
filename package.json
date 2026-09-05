@@ -5,7 +5,8 @@
   "description": "A semantic type system for composing Ethereum verification — meaning-level type-checking.",
   "license": "Apache-2.0",
   "scripts": {
-    "demo": "node runner/demo.mjs"
+    "demo": "node runner/demo.mjs",
+    "test": "node --test runner/test/*.test.mjs"
   },
   "engines": { "node": ">=18" }
 }

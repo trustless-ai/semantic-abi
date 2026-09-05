@@ -1,14 +1,13 @@
 import { PAIR } from "../src/evaluate.mjs";
 
-// Vectors: each pins an expected PAIR outcome (the oracle). A "tampered" fixture is a case
-// where the two evidence readings SHOULD read apart — so a correct backend reports VIOLATED
-// and a collapsing one reports PRESERVED.
+// Vectors pin expected_pair (the oracle). Adapters independently produce observed_pair;
+// conformance is derived only after both values exist.
 export const VECTORS = [
   // 1 — signed decision commitment: reject/evidence_against ≠ reject/insufficient_evidence
   { id: "c1-clean",    relation: "signed_decision_commitment", oracle: PAIR.PRESERVED,
     fixture: "verdict carries a distinct reason all the way into the signed commitment" },
   { id: "c1-tampered", relation: "signed_decision_commitment", oracle: PAIR.VIOLATED,
-    fixture: "reject with no evidence either way — honest reason is 'insufficient', must not fold into 'evidence_against'" },
+    fixture: "same reject verdict with a changed epistemic_basis; v18 must detect the authenticated distinction" },
 
   // 2 — authority separation: InfrastructureAttestation ≠ OnchainCommitment
   { id: "c2-clean",    relation: "authority_separation", oracle: PAIR.PRESERVED,

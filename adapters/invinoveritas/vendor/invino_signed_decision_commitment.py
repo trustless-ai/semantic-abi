@@ -18,16 +18,21 @@ THE PROTECTED RELATION UNDER TEST: two REJECT verdicts differing ONLY in epistem
 ("evidence_against" | "insufficient_evidence" -- a deterministic-engine finding vs. a mere
 confidence-floor escalation, semantically distinct situations) MUST produce DIFFERENT
 decision_refs -- an agent consuming only the lightweight decision_ref (not the full signed
-event) needs to be able to tell them apart.
+event) needs to be able to tell them apart. That's an ADVERSARIAL pair: the underlying claim
+genuinely differs regardless of which code version processes it, so the true (oracle) state for
+this pair is always VIOLATED -- what changes across versions is whether the mechanism correctly
+OBSERVES that. A separate CLEAN pair (same epistemic_basis both sides, no tampering) is the
+control: oracle=PRESERVED, since nothing should ever distinguish identical input.
 
 THE REAL HISTORICAL BUG: before REVIEW_POLICY_VERSION v18 (commit 56e5999d, 2026-09-04),
-epistemic_basis was not in DECISION_REF_PREIMAGE_FIELDS at all -- two such verdicts collapsed to
-the IDENTICAL decision_ref. v18 appended epistemic_basis as the tuple's final element, fixing it.
-PRE_V18_FIELDS below is simply DECISION_REF_PREIMAGE_FIELDS with that documented final element
-dropped (confirmed via `git show 56e5999d` -- epistemic_basis was appended, nothing else in the
-tuple changed) -- a faithful replay of the actual historical preimage shape, not a guess.
+epistemic_basis was not in DECISION_REF_PREIMAGE_FIELDS at all -- the adversarial pair collapsed
+to the IDENTICAL decision_ref (undetected violation). v18 appended epistemic_basis as the tuple's
+final element, fixing it. PRE_V18_FIELDS below is simply DECISION_REF_PREIMAGE_FIELDS with that
+documented final element dropped (confirmed via `git show 56e5999d` -- epistemic_basis was
+appended, nothing else in the tuple changed) -- a faithful replay of the actual historical
+preimage shape, not a guess.
 
-Usage: python3 invino_signed_decision_commitment.py <pre_v18|post_v18>
+Usage: python3 invino_signed_decision_commitment.py <pre_v18|post_v18|post_v18_clean>
 Prints JSON: {"ref_evidence_against": "...", "ref_insufficient_evidence": "...", "distinct": bool}
 """
 from __future__ import annotations
@@ -61,9 +66,9 @@ def compute_decision_ref(fields: dict, preimage_fields: tuple[str, ...] | None =
 PRE_V18_FIELDS = DECISION_REF_PREIMAGE_FIELDS[:-1]
 assert DECISION_REF_PREIMAGE_FIELDS[-1] == "epistemic_basis"
 
-# A realistic REJECT payload pair -- identical in every field except epistemic_basis. Synthetic
-# on purpose (no real artifact_hash exists for this pair): the test is whether the preimage
-# mechanism distinguishes the two, not whether either payload is a real verdict.
+# A realistic REJECT payload -- synthetic on purpose (no real artifact_hash exists for this
+# fixture): the test is whether the preimage mechanism distinguishes/preserves correctly, not
+# whether the payload is a real verdict.
 _BASE_FIELDS = {
     "artifact_hash": "sha256:fixture0000000000000000000000000000000000000000000000000000000000",
     "artifact_type": "onchain_action",
@@ -88,9 +93,9 @@ _BASE_FIELDS = {
 }
 
 
-def _pair_refs(preimage_fields: tuple[str, ...]) -> dict:
+def _pair_refs(preimage_fields: tuple[str, ...], basis_b: str) -> dict:
     fields_a = {**_BASE_FIELDS, "epistemic_basis": "evidence_against"}
-    fields_b = {**_BASE_FIELDS, "epistemic_basis": "insufficient_evidence"}
+    fields_b = {**_BASE_FIELDS, "epistemic_basis": basis_b}
     ref_a = compute_decision_ref(fields_a, preimage_fields=preimage_fields)
     ref_b = compute_decision_ref(fields_b, preimage_fields=preimage_fields)
     return {
@@ -101,12 +106,17 @@ def _pair_refs(preimage_fields: tuple[str, ...]) -> dict:
 
 
 def main() -> None:
-    if len(sys.argv) != 2 or sys.argv[1] not in ("pre_v18", "post_v18"):
-        print("usage: invino_signed_decision_commitment.py <pre_v18|post_v18>", file=sys.stderr)
+    modes = ("pre_v18", "post_v18", "post_v18_clean")
+    if len(sys.argv) != 2 or sys.argv[1] not in modes:
+        print(f"usage: invino_signed_decision_commitment.py <{'|'.join(modes)}>", file=sys.stderr)
         sys.exit(2)
     mode = sys.argv[1]
-    fields = PRE_V18_FIELDS if mode == "pre_v18" else DECISION_REF_PREIMAGE_FIELDS
-    print(json.dumps(_pair_refs(fields)))
+    if mode == "pre_v18":
+        print(json.dumps(_pair_refs(PRE_V18_FIELDS, "insufficient_evidence")))
+    elif mode == "post_v18":
+        print(json.dumps(_pair_refs(DECISION_REF_PREIMAGE_FIELDS, "insufficient_evidence")))
+    else:  # post_v18_clean -- no tampering, same epistemic_basis both sides
+        print(json.dumps(_pair_refs(DECISION_REF_PREIMAGE_FIELDS, "evidence_against")))
 
 
 if __name__ == "__main__":

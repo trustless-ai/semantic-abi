@@ -17,16 +17,23 @@ deterministic finding (`evidence_against`) or from mere below-floor confidence
 `56e5999d13dbcf4720a67a4a079123301f9d290e`) fixed it by appending `epistemic_basis` as the
 preimage's final field.
 
-- **pre-v18 replay** (`invino-pre-v18-replay`): the same two verdicts run through the
-  pre-v18 preimage shape → `oracle VIOLATED, observed VIOLATED, backend PASS` — the real historical
-  collapse, independently reconfirmed, not just asserted.
-- **post-v18 live** (`invino-post-v18-live`): the same two verdicts run through the current
-  preimage shape → `oracle PRESERVED, observed PRESERVED, backend PASS` — the fix genuinely holds.
+Three vectors, oracle fixed and version-independent (an adversarial pair's underlying claim is
+genuinely different no matter which code processes it — what changes is whether the backend
+*observes* that):
+- **`invino-pre-v18-adversarial`**: `oracle VIOLATED, observed PRESERVED, backend FAIL` — the real
+  historical collapse, reproduced, not a bug in this adapter. A conforming adapter is *supposed*
+  to reproduce this exact failure when replaying the pre-v18 preimage shape.
+- **`invino-post-v18-adversarial`**: `oracle VIOLATED, observed VIOLATED, backend PASS` — the same
+  adversarial pair against the current preimage shape; the fix genuinely holds.
+- **`invino-post-v18-clean`**: `oracle PRESERVED, observed PRESERVED, backend PASS` — a control
+  (same `epistemic_basis` both sides, no tampering), proving the adapter isn't just always
+  reporting "different" regardless of input.
 
-`backend PASS` on both is the point: the adapter's own recompute mechanism honestly detects the
-real historical failure *and* confirms the real fix, matching this repo's own rule (a tampered/bad
-case must read `pair VIOLATED, backend PASS` — `backend FAIL` is reserved for a checker that itself
-collapses the distinction, which this one does not).
+(An earlier version of this adapter incorrectly made the oracle itself version-dependent —
+pre-v18=`PRESERVED`, post-v18=`VIOLATED` — conflating "the mechanism now works" with "the ground
+truth changed." Caught by comparing against Pavlo's independently-authored
+`fix/v0-semantic-model-consistency` branch, which uses the correct framing; fixed same session,
+kept here rather than scrubbed from history.)
 
 **Provenance note (read `vendor/invino_signed_decision_commitment.py`'s own header first):** the
 vendored `compute_decision_ref` + `DECISION_REF_PREIMAGE_FIELDS` are a verbatim, hash-cited copy of

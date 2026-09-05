@@ -22,9 +22,15 @@ if (witnesses.length) {
   for (const w of witnesses) console.log(`  ✗ ${w.adapter} · ${w.vector}: ${w.minimal}`);
 }
 
-const wantPass = rows.every((r) => r.backend === BACKEND.PASS);
+// Expected pattern: the pre-v18 replay MUST fail (that's the real historical bug, reproduced,
+// not a bug in this adapter) -- post-v18 and the clean control must both pass.
+const byId = Object.fromEntries(rows.map((r) => [r.vector, r]));
+const expected =
+  byId["invino-pre-v18-adversarial"]?.backend === BACKEND.FAIL &&
+  byId["invino-post-v18-adversarial"]?.backend === BACKEND.PASS &&
+  byId["invino-post-v18-clean"]?.backend === BACKEND.PASS;
 console.log(
-  wantPass
-    ? "\n  Both vectors PASS: the real pre-v18 collapse replays as VIOLATED, the real v18 fix replays as PRESERVED — independently recomputed, not asserted.\n"
-    : "\n  Unexpected result — see rows above.\n"
+  expected
+    ? "\n  Matches the expected pattern: the real pre-v18 collapse reproduces as a genuine FAIL, the real v18 fix and a clean control both PASS — independently recomputed, not asserted.\n"
+    : "\n  Does NOT match the expected pattern — see rows above, something regressed.\n"
 );

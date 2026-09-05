@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trustless-ai/semantic-abi/schema/manifest.schema.json",
+  "title": "semantic-abi manifest (v0-draft)",
+  "description": "Declares what a component's evidence is allowed to mean. NOT YET FROZEN — see manifest-v0.md open items.",
+  "type": "object",
+  "required": ["component", "declarations"],
+  "properties": {
+    "component": { "type": "string", "description": "system/endpoint identifier, e.g. invinoveritas./review" },
+    "author": { "type": "string", "description": "owner handle — adapters are authored independently" },
+    "declarations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["endpoint", "establishes", "does_not_establish", "authority_class"],
+        "properties": {
+          "endpoint": { "type": "string" },
+          "consumes": { "type": "string" },
+          "establishes": {
+            "description": "exactly ONE authority class this endpoint genuinely creates",
+            "$ref": "#/$defs/authorityClass"
+          },
+          "does_not_establish": {
+            "description": "classes explicitly disclaimed — enables the linker TYPE ERROR",
+            "type": "array",
+            "items": { "$ref": "#/$defs/authorityClass" }
+          },
+          "authority_class": { "$ref": "#/$defs/authorityClass" },
+          "scope": { "type": "string" },
+          "as_of": {
+            "description": "OPEN: split issued_at vs verified_at before freezing",
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "authorityClass": {
+      "type": "string",
+      "description": "v0-draft open enum — to be frozen as a closed set",
+      "examples": [
+        "INDEPENDENT_JUDGMENT",
+        "CRYPTOGRAPHIC_VERIFICATION",
+        "EX_POST_VALIDATION",
+        "INFRASTRUCTURE_ATTESTATION",
+        "ONCHAIN_COMMITMENT",
+        "INDEPENDENT_RECOMPUTATION",
+        "KEY_BINDING_AUTHORITY",
+        "SEMANTIC_VERIFICATION",
+        "CONSENSUS_VALIDATED_HEADER",
+        "STATE_INCLUSION",
+        "NOT_BACKDATED",
+        "ECONOMIC_SETTLEMENT"
+      ]
+    }
+  }
+}

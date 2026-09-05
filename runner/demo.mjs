@@ -3,7 +3,7 @@
 //   2. Expected pair / observed pair / backend conformance kept explicit.
 import { linkEdge } from "./src/linker.mjs";
 import { run } from "./src/evaluate.mjs";
-import { goodBackend, collapsingBackend, pendingBackend } from "./src/adapters.mjs";
+import { goodBackend, collapsingBackend } from "./src/adapters.mjs";
 import { VECTORS } from "./vectors/relations.mjs";
 
 const line = (s = "") => console.log(s);
@@ -70,13 +70,13 @@ for (const [producer, required] of checks) {
 
 // ── 2. Two-level protected-relation runner ───────────────────────────────────
 rule();
-line("  2. RUNNER — expected pair × observed pair × backend conformance");
+line("  2. RUNNER — expected pair × observed pair × backend conformance (2 independent backends)");
 rule();
 
 const adapters = [
   goodBackend("vertice-gw"),
-  collapsingBackend("invinoveritas@pre-v18", "signed_decision_commitment"),
-  pendingBackend("horizon-shield"),
+  collapsingBackend("invinoveritas@pre-v18", "signed_decision_commitment"), // replay of the real bug
+  // horizon-shield (Toshikatsu) deferred to post-ETHOnline — see adapters/horizon-shield returns after the event
 ];
 
 const { rows, witnesses, tally } = run(VECTORS, adapters);

@@ -34,4 +34,5 @@ every tampered fixture correctly reads *pair VIOLATED, backend PASS* on conformi
 - [ ] manifest loader + JSON-Schema validation against `../schema/manifest.schema.json`
 - [ ] real per-owner adapters reading live/replay endpoints (`../adapters/*`) — no shared checker
 - [ ] pin the pre-v18 replay evidence
-- [ ] freeze the authority-class enum + resolve `as_of`
+- [ ] freeze the authority-class enum
+- [x] `as_of` resolved — split into `issued_at` vs `verification_time` (never both on one claim); see `../schema/manifest-v0.md` (commit 7ef8761)

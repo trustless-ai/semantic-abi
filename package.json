@@ -1,0 +1,11 @@
+{
+  "name": "semantic-abi",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "A semantic type system for composing Ethereum verification — meaning-level type-checking.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "demo": "node runner/demo.mjs"
+  },
+  "engines": { "node": ">=18" }
+}

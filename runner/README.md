@@ -13,11 +13,25 @@ A tampered input must yield **pair VIOLATED + backend PASS** (the backend detect
 reserved for a genuine collapse. Never conflate the two — collapsing them is the defect this tool exists to
 find.
 
-## Status
-Stub. To build during ETHOnline:
-- [ ] manifest loader + JSON-Schema validation (`../schema/manifest.schema.json`)
-- [ ] semantic linker: `producer.establishes ⊇ consumer.requires` → edge | TYPE ERROR + counterexample
-- [ ] vector format (fixture + pinned expected pair outcome)
-- [ ] adapter interface (live + replay)
-- [ ] witness / counterexample emitter
-- [ ] two-level reporter
+## Run it (zero dependencies)
+```
+node runner/demo.mjs
+```
+Shows: (1) the semantic linker passing a valid edge and throwing two meaning-level TYPE ERRORs with
+counterexamples; (2) the two-level runner across three independent adapters, reproducing a real
+signed-commitment collapse (`invinoveritas@pre-v18`) as a single backend FAIL + a minimal witness — while
+every tampered fixture correctly reads *pair VIOLATED, backend PASS* on conforming adapters.
+
+## Working now
+- ✅ `src/classes.mjs` — authority classes + satisfy-closure
+- ✅ `src/linker.mjs` — `producer.establishes ⊇ consumer.requires` → edge | TYPE ERROR + counterexample
+- ✅ `src/evaluate.mjs` — two-level evaluator (pair × backend) + witness emitter + tallies
+- ✅ `src/adapters.mjs` — reference adapters (good / collapsing / pending)
+- ✅ `vectors/relations.mjs` — vectors pinning expected pair outcomes for the 3 relations
+- ✅ `demo.mjs` — end-to-end runnable
+
+## Next (ETHOnline)
+- [ ] manifest loader + JSON-Schema validation against `../schema/manifest.schema.json`
+- [ ] real per-owner adapters reading live/replay endpoints (`../adapters/*`) — no shared checker
+- [ ] pin the pre-v18 replay evidence
+- [ ] freeze the authority-class enum + resolve `as_of`

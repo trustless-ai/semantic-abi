@@ -34,8 +34,8 @@ every tampered fixture correctly reads *pair VIOLATED, backend PASS* on conformi
 - [ ] manifest loader + JSON-Schema validation against `../schema/manifest.schema.json`
 - [~] real per-owner adapters reading live/replay endpoints (`../adapters/*`) — no shared checker.
       `invinoveritas` has one real adapter now (`signed_decision_commitment` only —
-      `../adapters/invinoveritas/`, `node ../adapters/invinoveritas/demo.mjs`); `vertice` and
-      `horizon-shield` still reference-only, and invinoveritas's own other two relations
+      `../adapters/invinoveritas/`, `node ../adapters/invinoveritas/demo.mjs`); `vertice`
+      still reference-only (horizon-shield deferred to post-ETHOnline), and invinoveritas's own other two relations
       (`authority_separation`, `proof_vs_header_authority`) are still unwired too
 - [x] pin the pre-v18 replay evidence — done for `signed_decision_commitment`
       (`../adapters/invinoveritas/vendor/`, real git-cited before/after, not synthetic)

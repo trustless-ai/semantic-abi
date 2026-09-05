@@ -5,7 +5,7 @@
 //      the pre-v18 collapse as oracle=VIOLATED, observed=PRESERVED, backend=FAIL + a witness.
 import { linkEdge } from "./src/linker.mjs";
 import { run } from "./src/evaluate.mjs";
-import { goodBackend, collapsingBackend, pendingBackend } from "./src/adapters.mjs";
+import { goodBackend, collapsingBackend } from "./src/adapters.mjs";
 import { VECTORS } from "./vectors/relations.mjs";
 
 const line = (s = "") => console.log(s);
@@ -52,13 +52,13 @@ for (const [producer, required] of checks) {
 
 // ── 2. Two-level protected-relation runner ───────────────────────────────────
 rule();
-line("  2. RUNNER — oracle_pair · observed_pair · backend, kept separate (3 backends)");
+line("  2. RUNNER — oracle_pair · observed_pair · backend, kept separate (2 independent backends)");
 rule();
 
 const adapters = [
   goodBackend("vertice-gw"),
   collapsingBackend("invinoveritas@pre-v18", "signed_decision_commitment"), // replay of the real bug
-  pendingBackend("horizon-shield"),
+  // horizon-shield (Toshikatsu) deferred to post-ETHOnline — see adapters/horizon-shield returns after the event
 ];
 
 const { rows, witnesses, tally } = run(VECTORS, adapters);

@@ -14,4 +14,7 @@ mapping their responses to the semantic manifest declarations in `../../schema/m
 The protected pair remains violated in both comparisons. What changes at v18 is the backend observation:
 the repaired backend detects the distinction. A clean, unchanged control pair is separately `PRESERVED`.
 
-To wire once the manifest schema freezes.
+**Wired.** `adapter.mjs`/`vectors.mjs`/`demo.mjs`/`vendor/` are real, not placeholders — run
+`node adapters/invinoveritas/demo.mjs` (needs `python3` on PATH, stdlib only). Ported to this
+branch's `expected_pair`/`observed_pair`/`backend_conformance` field names — 17/17 suite + both
+demos pass here.

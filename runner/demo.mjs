@@ -1,50 +1,58 @@
 // semantic-abi — runnable demo. Zero dependencies: `node runner/demo.mjs`.
-//   1. Semantic linker: a valid edge + a meaning-level TYPE ERROR (+ counterexample).
-//   2. Two-level runner: pair outcome × backend conformance across independent adapters,
-//      reproducing a real relation collapse as a minimal witness.
+//   1. Semantic linker: valid edge + TYPE ERRORs, incl. a claim/scope-specific one
+//      (recompute of one receipt does NOT establish semantic verification of another).
+//   2. Two-level runner: oracle_pair / observed_pair / backend kept separate, reproducing
+//      the pre-v18 collapse as oracle=VIOLATED, observed=PRESERVED, backend=FAIL + a witness.
 import { linkEdge } from "./src/linker.mjs";
 import { run } from "./src/evaluate.mjs";
 import { goodBackend, collapsingBackend, pendingBackend } from "./src/adapters.mjs";
 import { VECTORS } from "./vectors/relations.mjs";
 
 const line = (s = "") => console.log(s);
-const rule = () => line("─".repeat(72));
+const rule = () => line("─".repeat(74));
 
 line("\n  semantic-abi · demo — type-check MEANING, not bytes\n");
 
-// ── 1. Semantic linker ───────────────────────────────────────────────────────
+// ── 1. Semantic linker (claim- and scope-specific) ───────────────────────────
 rule();
-line("  1. SEMANTIC LINKER — can this composition upgrade authority silently?");
+line("  1. SEMANTIC LINKER — authority transfers only for the SAME claim at the SAME scope");
 rule();
 
-const verticeVerify = { component: "vertice./verify", establishes: "INDEPENDENT_RECOMPUTATION",
-  does_not_establish: ["ECONOMIC_SETTLEMENT"] };
-const verticeAttest = { component: "vertice.attestation", establishes: "INFRASTRUCTURE_ATTESTATION",
-  does_not_establish: ["SEMANTIC_VERIFICATION", "INDEPENDENT_RECOMPUTATION", "OUTCOME_SETTLEMENT"] };
-const onchainAnchor = { component: "vertice.anchor@testnet", establishes: "ONCHAIN_COMMITMENT",
-  does_not_establish: ["ECONOMIC_SETTLEMENT", "SEMANTIC_VERIFICATION"] };
+const recompute = {
+  component: "vertice./verify",
+  establishes: { authority_class: "INDEPENDENT_RECOMPUTATION", claim_type: "agent_action", scope: "receipt:0xab12" },
+  does_not_establish: [],
+};
+const attest = {
+  component: "vertice.attestation",
+  establishes: { authority_class: "INFRASTRUCTURE_ATTESTATION", claim_type: "agent_action", scope: "receipt:0xab12" },
+  does_not_establish: ["SEMANTIC_VERIFICATION", "INDEPENDENT_RECOMPUTATION"],
+};
 
 const checks = [
-  [verticeVerify, "SEMANTIC_VERIFICATION"],   // valid — recomputation establishes it
-  [verticeAttest, "SEMANTIC_VERIFICATION"],   // TYPE ERROR — attestation is not verification
-  [onchainAnchor, "ECONOMIC_SETTLEMENT"],     // TYPE ERROR — testnet anchor is not settlement
+  // recompute of receipt 0xab12 ⇒ semantic verification of the SAME receipt — valid
+  [recompute, { authority_class: "SEMANTIC_VERIFICATION", claim_type: "agent_action", scope: "receipt:0xab12" }],
+  // recompute of 0xab12 ⇒ semantic verification of a DIFFERENT receipt — TYPE ERROR (no global upgrade)
+  [recompute, { authority_class: "SEMANTIC_VERIFICATION", claim_type: "agent_action", scope: "receipt:0xff99" }],
+  // attestation ⇒ semantic verification — TYPE ERROR (attestation is not verification; disclaimed)
+  [attest, { authority_class: "SEMANTIC_VERIFICATION", claim_type: "agent_action", scope: "receipt:0xab12" }],
 ];
 for (const [producer, required] of checks) {
   const r = linkEdge(producer, required);
   if (r.valid) {
-    line(`  ✓ ${producer.component}  ⇒  requires ${required}`);
+    line(`  ✓ ${producer.component}`);
     line(`      valid edge: ${r.edge}`);
   } else {
-    line(`  ✗ ${producer.component}  ⇒  requires ${required}`);
-    line(`      TYPE ERROR — ${r.counterexample.reason}`);
-    line(`      counterexample: ${r.counterexample.note}`);
+    line(`  ✗ ${producer.component}  —  TYPE ERROR (${r.counterexample.failed_on})`);
+    line(`      ${r.counterexample.producer_establishes}  ⇏  ${r.counterexample.consumer_requires}`);
+    line(`      ${r.counterexample.note}`);
   }
   line();
 }
 
 // ── 2. Two-level protected-relation runner ───────────────────────────────────
 rule();
-line("  2. RUNNER — pair outcome × backend conformance (three independent backends)");
+line("  2. RUNNER — oracle_pair · observed_pair · backend, kept separate (3 backends)");
 rule();
 
 const adapters = [
@@ -55,18 +63,18 @@ const adapters = [
 
 const { rows, witnesses, tally } = run(VECTORS, adapters);
 
-const pad = (s, n) => String(s).padEnd(n);
-line(`  ${pad("vector", 14)}${pad("adapter", 24)}${pad("pair", 14)}backend`);
-line(`  ${"-".repeat(66)}`);
+const pad = (s, n) => String(s === null ? "—" : s).padEnd(n);
+line(`  ${pad("vector", 13)}${pad("adapter", 24)}${pad("oracle", 13)}${pad("observed", 13)}backend`);
+line(`  ${"-".repeat(70)}`);
 for (const r of rows) {
-  line(`  ${pad(r.vector, 14)}${pad(r.adapter, 24)}${pad(r.pair, 14)}${r.backend}`);
+  line(`  ${pad(r.vector, 13)}${pad(r.adapter, 24)}${pad(r.oracle_pair, 13)}${pad(r.observed_pair, 13)}${r.backend}`);
 }
 
 line();
-line(`  pairs     · PRESERVED ${tally.PRESERVED}  VIOLATED ${tally.VIOLATED}  UNVERIFIABLE ${tally.UNVERIFIABLE}`);
-line(`  backends  · PASS ${tally.PASS}  FAIL ${tally.FAIL}  CANNOT_CHECK ${tally.CANNOT_CHECK}`);
+line(`  pairs (oracle) · PRESERVED ${tally.PRESERVED}  VIOLATED ${tally.VIOLATED}  UNVERIFIABLE ${tally.UNVERIFIABLE}`);
+line(`  backends       · PASS ${tally.PASS}  FAIL ${tally.FAIL}  CANNOT_CHECK ${tally.CANNOT_CHECK}`);
 
-// ── 3. Witnesses (minimal counterexamples) ───────────────────────────────────
+// ── 3. Witnesses ─────────────────────────────────────────────────────────────
 line();
 rule();
 line(`  3. WITNESSES — ${witnesses.length} collapse(s) caught`);
@@ -76,6 +84,6 @@ for (const w of witnesses) {
   line(`      ${w.minimal}`);
 }
 line();
-line("  Note: a tampered fixture is VIOLATED at the pair level, yet a correct backend still");
-line("  PASSes because it detected it. FAIL means a real distinction was collapsed. Two levels,");
-line("  never merged. Don't trust it — recompute it.\n");
+line("  A tampered fixture is oracle=VIOLATED; a correct backend observes VIOLATED and PASSes.");
+line("  FAIL = observed differs from oracle (a real collapse). Three values, never merged.");
+line("  Don't trust it — recompute it.\n");

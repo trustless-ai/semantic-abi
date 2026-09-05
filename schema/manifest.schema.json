@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://trustless-ai/semantic-abi/schema/manifest.schema.json",
   "title": "semantic-abi manifest (v0-draft)",
-  "description": "Declares what a component's evidence is allowed to mean. NOT YET FROZEN — see manifest-v0.md open items.",
+  "description": "Declares what a component's evidence is allowed to mean. NOT YET FROZEN — see manifest-v0.md.",
   "type": "object",
   "required": ["component", "declarations"],
   "properties": {
@@ -11,36 +11,14 @@
     "declarations": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "type": "object",
-        "required": ["endpoint", "establishes", "does_not_establish", "authority_class"],
-        "properties": {
-          "endpoint": { "type": "string" },
-          "consumes": { "type": "string" },
-          "establishes": {
-            "description": "exactly ONE authority class this endpoint genuinely creates",
-            "$ref": "#/$defs/authorityClass"
-          },
-          "does_not_establish": {
-            "description": "classes explicitly disclaimed — enables the linker TYPE ERROR",
-            "type": "array",
-            "items": { "$ref": "#/$defs/authorityClass" }
-          },
-          "authority_class": { "$ref": "#/$defs/authorityClass" },
-          "scope": { "type": "string" },
-          "as_of": {
-            "description": "OPEN: split issued_at vs verified_at before freezing",
-            "type": "string"
-          }
-        }
-      }
+      "items": { "$ref": "#/$defs/declaration" }
     }
   },
   "$defs": {
     "authorityClass": {
       "type": "string",
       "description": "v0-draft open enum — to be frozen as a closed set",
-      "examples": [
+      "enum": [
         "INDEPENDENT_JUDGMENT",
         "CRYPTOGRAPHIC_VERIFICATION",
         "EX_POST_VALIDATION",
@@ -53,6 +31,47 @@
         "STATE_INCLUSION",
         "NOT_BACKDATED",
         "ECONOMIC_SETTLEMENT"
+      ]
+    },
+    "evidenceType": {
+      "type": "object",
+      "description": "Authority never transfers on class alone — only for the SAME claim at the SAME scope.",
+      "required": ["authority_class", "claim_type", "scope"],
+      "properties": {
+        "authority_class": { "$ref": "#/$defs/authorityClass" },
+        "claim_type": { "type": "string" },
+        "scope": { "type": "string" }
+      }
+    },
+    "declaration": {
+      "type": "object",
+      "required": ["endpoint", "establishes", "does_not_establish"],
+      "properties": {
+        "endpoint": { "type": "string" },
+        "consumes": { "type": "string" },
+        "establishes": {
+          "description": "the ONE evidence type this endpoint genuinely creates (authority_class + claim_type + scope)",
+          "$ref": "#/$defs/evidenceType"
+        },
+        "does_not_establish": {
+          "description": "authority classes explicitly disclaimed — this field is what makes a TYPE ERROR possible",
+          "type": "array",
+          "items": { "$ref": "#/$defs/authorityClass" }
+        }
+      },
+      "oneOf": [
+        {
+          "description": "a component that ORIGINATES a claim carries issued_at",
+          "required": ["issued_at"],
+          "not": { "required": ["verification_time"] },
+          "properties": { "issued_at": { "type": "string", "description": "when this component made its own claim" } }
+        },
+        {
+          "description": "a component whose job is CHECKING someone else's claim carries verification_time",
+          "required": ["verification_time"],
+          "not": { "required": ["issued_at"] },
+          "properties": { "verification_time": { "type": "string", "description": "when this check ran (distinct from the checked claim's issued_at)" } }
+        }
       ]
     }
   }

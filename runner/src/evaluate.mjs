@@ -2,14 +2,14 @@
 export const PAIR = { PRESERVED: "PRESERVED", VIOLATED: "VIOLATED", UNVERIFIABLE: "UNVERIFIABLE" };
 export const BACKEND = { PASS: "PASS", FAIL: "FAIL", CANNOT_CHECK: "CANNOT_CHECK" };
 
-// Evaluate one vector against one adapter.
-//   vector : { id, relation, oracle: <pair outcome the fixture pins>, fixture }
-//   adapter: { name, observe(vector) -> pair outcome | null }
+// Evaluate one vector against one adapter. THREE values are always reported separately —
+// never collapsed (Pavlo, before-freeze review):
+//   oracle_pair   = what the fixture pins the evidence pair as doing (ground truth)
+//   observed_pair = what THIS backend actually reported (or null if it couldn't check)
+//   backend       = PASS if observed==oracle, FAIL if it collapsed to a different outcome, CANNOT_CHECK if it couldn't run
 //
-// pair outcome    = what the evidence pair actually did (the fixture's pinned oracle)
-// backend conf.   = did the backend correctly REPORT it (observed vs oracle)
-// A tampered fixture (oracle=VIOLATED) with a correct backend => pair VIOLATED, backend PASS.
-// backend FAIL is reserved for a genuine collapse (observed a different outcome than the truth).
+//   vector : { id, relation, oracle: <pair outcome>, fixture }
+//   adapter: { name, observe(vector) -> pair outcome | null }
 export function evaluate(vector, adapter) {
   let observed;
   try {
@@ -17,28 +17,32 @@ export function evaluate(vector, adapter) {
   } catch {
     observed = null;
   }
+  const base = { relation: vector.relation, vector: vector.id, adapter: adapter.name, oracle_pair: vector.oracle };
+
   if (observed == null) {
-    return { relation: vector.relation, vector: vector.id, adapter: adapter.name, pair: PAIR.UNVERIFIABLE, backend: BACKEND.CANNOT_CHECK, observed: null };
+    return { ...base, observed_pair: null, backend: BACKEND.CANNOT_CHECK };
   }
   if (observed === vector.oracle) {
-    return { relation: vector.relation, vector: vector.id, adapter: adapter.name, pair: vector.oracle, backend: BACKEND.PASS, observed };
+    return { ...base, observed_pair: observed, backend: BACKEND.PASS };
   }
-  // Mismatch: the backend reported a different pair outcome than the fixture's truth — a collapse.
+  // The backend reported a different pair outcome than the fixture's truth — a collapse.
+  // e.g. oracle_pair=VIOLATED, observed_pair=PRESERVED, backend=FAIL — all three kept distinct.
   return {
-    relation: vector.relation, vector: vector.id, adapter: adapter.name,
-    pair: vector.oracle, backend: BACKEND.FAIL, observed,
+    ...base,
+    observed_pair: observed,
+    backend: BACKEND.FAIL,
     witness: {
       relation: vector.relation,
       vector: vector.id,
       adapter: adapter.name,
       oracle_pair: vector.oracle,
       observed_pair: observed,
-      minimal: `expected pair ${vector.oracle}, backend reported ${observed} — protected relation collapsed`,
+      minimal: `oracle ${vector.oracle}, observed ${observed} — protected relation collapsed by the backend`,
     },
   };
 }
 
-// Run every vector across every adapter; return rows + collected witnesses + two-level tallies.
+// Run every vector across every adapter; return rows + witnesses + separate pair/backend tallies.
 export function run(vectors, adapters) {
   const rows = [];
   const witnesses = [];
@@ -47,7 +51,7 @@ export function run(vectors, adapters) {
     for (const a of adapters) {
       const r = evaluate(v, a);
       rows.push(r);
-      tally[r.pair]++;
+      tally[r.oracle_pair]++; // pair tally follows the ground-truth pair outcome
       tally[r.backend]++;
       if (r.witness) witnesses.push(r.witness);
     }

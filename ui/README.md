@@ -5,6 +5,7 @@ checked by the independent adapters against the protected relations, two-level r
 recompute in the browser. The semantic linker (meaning-level TYPE ERROR) is the Ethereum-scale closing
 concept, not the weekend build.
 
-Interactive design mock (shape reference): https://claude.ai/code/artifact/9c17a8c3-e22d-4d8a-833f-6a9e01d13431
+`index.html` is the built, self-contained demo page (no external libraries — survives IPFS + CSP).
 
-To build during ETHOnline.
+Live, pinned over ENS: https://trustless-ai.eth.limo/semantic-abi/
+(served from the org site repo `trustless-ai/trustless-ai-landing`; this copy is the in-repo source of record).
